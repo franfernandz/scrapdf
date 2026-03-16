@@ -2,7 +2,7 @@
 
 A browser-based tool that crawls document directories and exports a structured Excel spreadsheet with all PDF download links — reducing a multi-day manual task to under a minute.
 
-**[Live demo →](https://extractpdf.netlify.app)**
+**[Live demo →](https://lpdfe.netlify.app)**
 
 ---
 

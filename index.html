@@ -573,24 +573,38 @@ function setProgress(pct, text, count) {
   if (count !== undefined) document.getElementById('progressCount').textContent = count + ' PDFs';
 }
 
-const CORS_PROXY = 'https://corsproxy.io/?';
-let useProxy = true;
+const PROXIES = [
+  { url: u => `https://api.allorigins.win/get?url=${encodeURIComponent(u)}`, json: true },
+  { url: u => `https://corsproxy.io/?${encodeURIComponent(u)}`, json: false },
+  { url: u => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`, json: false },
+];
 
 async function fetchPage(url) {
-  const fetchUrl = useProxy ? CORS_PROXY + encodeURIComponent(url) : url;
+  // Intentar primero sin proxy
   try {
-    const resp = await fetch(fetchUrl);
-    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-    return await resp.text();
-  } catch (e) {
-    if (!useProxy) {
-      log('Direct access blocked — retrying via proxy...', 'info');
-      useProxy = true;
-      return await fetchPage(url);
+    const resp = await fetch(url);
+    if (resp.ok) return await resp.text();
+  } catch(_) {}
+
+  // Rotar proxies hasta encontrar uno que funcione
+  for (let i = 0; i < PROXIES.length; i++) {
+    const proxy = PROXIES[i];
+    try {
+      const resp = await fetch(proxy.url(url));
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      if (proxy.json) {
+        const data = await resp.json();
+        if (data && data.contents) return data.contents;
+        throw new Error('Respuesta vacía');
+      }
+      return await resp.text();
+    } catch(e) {
+      log(`Proxy ${i + 1}/${PROXIES.length} falló — probando siguiente...`, 'dim');
     }
-    log(`Error accessing: ${url} → ${e.message}`, 'err');
-    return null;
   }
+
+  log(`No se pudo acceder a: ${url}`, 'err');
+  return null;
 }
 
 function resolveUrl(base, href) {
