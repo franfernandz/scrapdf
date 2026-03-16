@@ -1,0 +1,833 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Extractor de Links PDF</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@300;400;600&display=swap');
+
+  :root {
+    --bg: #6818a5;
+    --surface: #c879ff;
+    --border: #ffb7ff;
+    --accent: #caff8a;
+    --accent-dim: #5a189a;
+    --text: #dec9e9;
+    --text-dim: #f3c4fb;
+    --error: #ff5f5f;
+    --success: #60f0a8;
+    --mono: 'IBM Plex Mono', monospace;
+    --sans: 'IBM Plex Sans', sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 40px 16px 64px;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(200,240,96,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(200,240,96,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .container {
+    width: 100%;
+    max-width: 720px;
+    position: relative;
+    z-index: 1;
+  }
+
+  /* Header */
+  header { margin-bottom: 40px; }
+
+  .tag {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--accent);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+
+  h1 {
+    font-family: var(--mono);
+    font-size: clamp(22px, 5vw, 36px);
+    font-weight: 600;
+    line-height: 1.15;
+  }
+
+  h1 span { color: var(--accent); }
+
+  .subtitle {
+    margin-top: 10px;
+    color: var(--text-dim);
+    font-size: 14px;
+    font-weight: 300;
+    line-height: 1.6;
+    max-width: 520px;
+  }
+
+  /* How it works */
+  .how-it-works {
+    margin-bottom: 24px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+
+  .how-toggle {
+    width: 100%;
+    background: var(--surface);
+    border: none;
+    padding: 14px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+    color: var(--text-dim);
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    transition: color 0.2s;
+    text-align: left;
+  }
+
+  .how-toggle:hover { color: var(--accent); background: var(--surface); }
+
+  .how-toggle .arrow {
+    transition: transform 0.25s ease;
+    font-size: 10px;
+    color: var(--accent);
+    flex-shrink: 0;
+    margin-left: 12px;
+  }
+
+  .how-toggle.open .arrow { transform: rotate(180deg); }
+
+  .how-body {
+    display: none;
+    background: #111;
+    padding: 20px;
+    border-top: 1px solid var(--border);
+  }
+
+  .how-body.open { display: block; }
+
+  .steps {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 18px;
+  }
+
+  .step { display: flex; flex-direction: column; gap: 7px; }
+
+  .step-num {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--accent);
+    letter-spacing: 0.1em;
+  }
+
+  .step-title { font-size: 13px; font-weight: 600; color: var(--text); }
+
+  .step-desc { font-size: 12px; color: var(--text-dim); line-height: 1.55; }
+
+  .how-note {
+    margin-top: 18px;
+    padding: 12px 16px;
+    background: rgba(200,240,96,0.04);
+    border-left: 2px solid var(--accent-dim);
+    border-radius: 0 3px 3px 0;
+    font-size: 12px;
+    color: var(--text-dim);
+    line-height: 1.6;
+  }
+
+  .how-note strong { color: var(--text); font-weight: 600; }
+  .how-note code {
+    font-family: var(--mono);
+    font-size: 11px;
+    background: rgba(255,255,255,0.06);
+    padding: 1px 5px;
+    border-radius: 2px;
+  }
+
+  /* Card */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 28px;
+    margin-bottom: 20px;
+  }
+
+  label {
+    display: block;
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    color: var(--accent-dim);
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+
+  .input-row {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  input[type="text"] {
+    flex: 1;
+    min-width: 0;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 11px 14px;
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--text);
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  input[type="text"]:focus { border-color: var(--accent); }
+  input[type="text"]::placeholder { color: var(--text-dim); }
+
+  .options-row {
+    display: flex;
+    gap: 20px;
+    margin-top: 18px;
+    flex-wrap: wrap;
+  }
+
+  .option-group { flex: 1; min-width: 150px; }
+
+  select {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 10px 32px 10px 12px;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text);
+    outline: none;
+    cursor: pointer;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23777' stroke-width='1.5' fill='none'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+  }
+
+  /* Buttons */
+  button {
+    background: var(--accent);
+    color: #0f0f0f;
+    border: none;
+    border-radius: 3px;
+    padding: 11px 24px;
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    letter-spacing: 0.05em;
+    transition: background 0.15s, transform 0.1s;
+    white-space: nowrap;
+  }
+
+  button:hover { background: #d9ff6e; }
+  button:active { transform: scale(0.98); }
+  button:disabled { background: var(--border); color: var(--text-dim); cursor: not-allowed; }
+
+  .btn-secondary {
+    background: transparent;
+    border: 1px solid var(--accent);
+    color: var(--accent);
+  }
+  .btn-secondary:hover { background: rgba(200,240,96,0.07); }
+
+  /* Progress */
+  .progress-wrap { display: none; margin-top: 18px; }
+  .progress-wrap.visible { display: block; }
+
+  .progress-label {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-dim);
+    margin-bottom: 8px;
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+
+  .progress-bar { height: 3px; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .progress-fill { height: 100%; background: var(--accent); width: 0%; transition: width 0.3s ease; }
+
+  /* Terminal */
+  .terminal {
+    background: #080808;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 16px 18px;
+    font-family: var(--mono);
+    font-size: 11px;
+    line-height: 1.8;
+    max-height: 200px;
+    overflow-y: auto;
+    display: none;
+    margin-bottom: 20px;
+    word-break: break-all;
+  }
+
+  .terminal.visible { display: block; }
+  .log-line { display: flex; gap: 10px; }
+  .log-time { color: var(--text-dim); flex-shrink: 0; }
+  .log-ok { color: var(--success); }
+  .log-err { color: var(--error); }
+  .log-info { color: var(--accent); }
+  .log-dim { color: var(--text-dim); }
+
+  /* Results */
+  .results-card {
+    display: none;
+    background: var(--surface);
+    border: 1px solid var(--accent);
+    border-radius: 4px;
+    padding: 24px 28px;
+  }
+
+  .results-card.visible { display: block; }
+
+  .results-title {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--accent);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin-bottom: 20px;
+  }
+
+  .stats {
+    display: flex;
+    gap: 24px;
+    margin-bottom: 22px;
+    flex-wrap: wrap;
+  }
+
+  .stat { display: flex; flex-direction: column; gap: 4px; }
+
+  .stat-value {
+    font-family: var(--mono);
+    font-size: clamp(22px, 5vw, 30px);
+    font-weight: 600;
+    color: var(--text);
+    line-height: 1;
+  }
+
+  .stat-label {
+    font-size: 10px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+  }
+
+  .filter-row {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 18px;
+    flex-wrap: wrap;
+    align-items: flex-end;
+  }
+
+  .filter-row .option-group { min-width: 140px; max-width: 200px; }
+
+  /* Table */
+  .table-wrap {
+    overflow-x: auto;
+    margin-bottom: 20px;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+
+  th {
+    background: #111;
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    color: var(--accent-dim);
+    text-transform: uppercase;
+    padding: 10px 12px;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+
+  td {
+    padding: 9px 12px;
+    border-bottom: 1px solid var(--border);
+    color: var(--text);
+    font-family: var(--mono);
+    max-width: 220px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: rgba(255,255,255,0.02); }
+  .td-url { color: var(--accent-dim); }
+
+  .more-rows {
+    text-align: center;
+    padding: 10px;
+    color: var(--text-dim);
+    font-size: 11px;
+    font-family: var(--mono);
+    background: #111;
+    border-top: 1px solid var(--border);
+  }
+
+  .actions { display: flex; gap: 10px; flex-wrap: wrap; }
+  .actions button { flex: 1; min-width: 140px; }
+
+  /* Mobile */
+  @media (max-width: 520px) {
+    body { padding: 28px 14px 48px; }
+    .card, .results-card { padding: 20px 16px; }
+    .input-row { flex-direction: column; }
+    .input-row button { width: 100%; }
+    .option-group { min-width: 100%; }
+    .filter-row .option-group { max-width: 100%; min-width: 100%; }
+    .steps { grid-template-columns: 1fr; }
+  }
+
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <header>
+    <div class="tag">// Internal Tool</div>
+    <h1>PDF download link<br><span>extractor</span></h1>
+    <p class="subtitle">It crawls a web directory and generates an Excel list with all the PDF files found, organized by folder and year.</p>
+  </header>
+
+  <div class="how-it-works">
+    <!--How it works Toggle-->
+    <button class="how-toggle" onclick="toggleHow(this)">
+      <span>How it works</span>
+      <span class="arrow">▼</span>
+    </button>
+    <div class="how-body">
+      <div class="steps">
+        <div class="step">
+          <div class="step-num">// 01</div>
+          <div class="step-title">Paste the URL</div>
+          <div class="step-desc">Enter the address of the web directory where the PDFs are located. It must be a navigable index (the page that lists the files in the browser).</div>
+        </div>
+        <div class="step">
+          <div class="step-num">// 02</div>
+          <div class="step-title">Scan</div>
+          <div class="step-desc">Automatically detects whether it's an Apache directory or a common website and chooses the correct strategy: traverses folders or navigates the site's pages following their internal links.</div>
+        </div>
+        <div class="step">
+          <div class="step-num">// 03</div>
+          <div class="step-title">Filter by year</div>
+          <div class="step-desc">Once the scan is complete, you can filter the results. The year is automatically detected from the folder name or the file name.</div>
+        </div>
+        <div class="step">
+          <div class="step-num">// 04</div>
+          <div class="step-title">Download the Excel</div>
+          <div class="step-desc">Export the list (filtered or complete) to a .xlsx file ready to use, with columns for year, folder, file name, and download URL.</div>
+        </div>
+      </div>
+      <div class="how-note">
+        <strong>Note about CORS:</strong>If the directory is in a different domain than this tool, requests are automatically routed through <strong>corsproxy.io</strong> as an intermediary. For production use on your own intranet, it is recommended to add the header <code>Access-Control-Allow-Origin</code> in Apache configuration.
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <label>Base URL of the directory</label>
+    <div class="input-row">
+      <input type="text" id="baseUrl" placeholder="https://example.gob.ar/archivos/normativas/" />
+      <button id="btnScan" onclick="startScan()">Scan</button>
+    </div>
+
+    <div class="options-row">
+      <div class="option-group">
+        <label>Excel file name</label>
+        <input type="text" id="fileName" value="pdf_list" />
+      </div>
+    </div>
+
+    <div class="progress-wrap" id="progressWrap">
+      <div class="progress-label">
+        <span id="progressText">Scanning...</span>
+        <span id="progressCount">0 PDFs</span>
+      </div>
+      <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+    </div>
+  </div>
+
+  <div class="terminal" id="terminal"></div>
+
+  <div class="results-card" id="resultsCard">
+    <div class="results-title">// results</div>
+
+    <div class="stats">
+      <div class="stat">
+        <div class="stat-value" id="statTotal">0</div>
+        <div class="stat-label">PDFs found</div>
+      </div>
+      <div class="stat">
+        <div class="stat-value" id="statFolders">0</div>
+        <div class="stat-label">Folders</div>
+      </div>
+      <div class="stat">
+        <div class="stat-value" id="statYears">0</div>
+        <div class="stat-label">Years detected</div>
+      </div>
+    </div>
+
+    <div class="filter-row">
+      <div class="option-group">
+        <label>Filter by year</label>
+        <select id="filterYear">
+          <option value="">All years</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Year</th>
+            <th>Folder</th>
+            <th>File</th>
+            <th>URL</th>
+          </tr>
+        </thead>
+        <tbody id="previewBody"></tbody>
+      </table>
+      <div class="more-rows" id="moreRows" style="display:none"></div>
+    </div>
+
+    <div class="actions">
+      <button onclick="downloadExcel()">↓ Download Excel</button>
+      <button class="btn-secondary" onclick="resetApp()">New scan</button>
+    </div>
+  </div>
+
+</div>
+<script>
+let allResults = [];
+
+function toggleHow(btn) {
+  btn.classList.toggle('open');
+  btn.nextElementSibling.classList.toggle('open');
+}
+
+function log(msg, type = 'info') {
+  const terminal = document.getElementById('terminal');
+  terminal.classList.add('visible');
+  const time = new Date().toTimeString().slice(0,8);
+  const line = document.createElement('div');
+  line.className = 'log-line';
+  line.innerHTML = `<span class="log-time">[${time}]</span><span class="log-${type}">${msg}</span>`;
+  terminal.appendChild(line);
+  terminal.scrollTop = terminal.scrollHeight;
+}
+
+function setProgress(pct, text, count) {
+  document.getElementById('progressWrap').classList.add('visible');
+  document.getElementById('progressFill').style.width = pct + '%';
+  if (text) document.getElementById('progressText').textContent = text;
+  if (count !== undefined) document.getElementById('progressCount').textContent = count + ' PDFs';
+}
+
+const CORS_PROXY = 'https://corsproxy.io/?';
+let useProxy = true;
+
+async function fetchPage(url) {
+  const fetchUrl = useProxy ? CORS_PROXY + encodeURIComponent(url) : url;
+  try {
+    const resp = await fetch(fetchUrl);
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    return await resp.text();
+  } catch (e) {
+    if (!useProxy) {
+      log('Direct access blocked — retrying via proxy...', 'info');
+      useProxy = true;
+      return await fetchPage(url);
+    }
+    log(`Error accessing: ${url} → ${e.message}`, 'err');
+    return null;
+  }
+}
+
+function resolveUrl(base, href) {
+  try { return new URL(href, base).href; } catch { return null; }
+}
+
+function extractYear(str) {
+  const m = str.match(/\b(19|20)\d{2}\b/);
+  return m ? m[0] : '';
+}
+
+function isApacheIndex(html) {
+  return /Index of\s*\//i.test(html) || /<title>Index of/i.test(html);
+}
+
+function isPdfLink(href) {
+  if (!href) return false;
+  const lower = href.toLowerCase().split('?')[0];
+  return lower.endsWith('.pdf');
+}
+
+function isSameDomain(url, baseHost) {
+  try { return new URL(url).hostname === baseHost; } catch { return false; }
+}
+
+// ── MODE 1: Apache/Nginx directory index ──
+async function scanDirectory(url, baseUrl, depth, results, visited) {
+  if (depth > 6 || visited.has(url)) return;
+  visited.add(url);
+
+  const html = await fetchPage(url);
+  if (!html) return;
+
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(html, 'text/html');
+  const pdfs = [], subdirs = [];
+
+  doc.querySelectorAll('a[href]').forEach(a => {
+    const href = a.getAttribute('href');
+    if (!href || href === '../' || href === './' || href === '/') return;
+    const full = resolveUrl(url, href);
+    if (!full) return;
+    if (isPdfLink(href)) pdfs.push(full);
+    else if (href.endsWith('/') && !href.startsWith('http')) subdirs.push(full);
+  });
+
+  const base = baseUrl.replace(/\/$/, '');
+  for (const fullUrl of pdfs) {
+    const filename = decodeURIComponent(fullUrl.split('/').pop());
+    const folder = new URL(fullUrl).pathname.replace(new URL(base).pathname, '').replace(/\/[^/]+$/, '') || '/';
+    const year = extractYear(fullUrl);
+    results.push({ año: year, carpeta: folder || '/', nombre: filename, url: fullUrl, origen: new URL(url).pathname });
+    setProgress(Math.min(95, 10 + results.length * 0.4), 'Mode: directory — scanning...', results.length);
+  }
+
+  if (pdfs.length > 0) log(`[directory] ${url} → ${pdfs.length} PDF(s)`, 'ok');
+
+  for (const subdirUrl of subdirs) {
+    log(`Entering: ${subdirUrl.replace(base, '')}`, 'dim');
+    await scanDirectory(subdirUrl, baseUrl, depth + 1, results, visited);
+  }
+}
+
+// ── MODE 2: Web crawler ──
+async function crawlWebsite(startUrl, results, visited) {
+  const baseHost = new URL(startUrl).hostname;
+  const queue = [startUrl];
+  const MAX_PAGES = 120;
+
+  while (queue.length > 0 && visited.size < MAX_PAGES) {
+    const url = queue.shift();
+    if (visited.has(url)) continue;
+    visited.add(url);
+
+    log(`Crawleando: ${url.replace(startUrl, '') || '/'}`, 'dim');
+    const html = await fetchPage(url);
+    if (!html) continue;
+
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html, 'text/html');
+
+    doc.querySelectorAll('a[href]').forEach(a => {
+      const href = a.getAttribute('href');
+      if (!href || href.startsWith('mailto:') || href.startsWith('tel:') || href.startsWith('#')) return;
+      const full = resolveUrl(url, href);
+      if (!full || !isSameDomain(full, baseHost)) return;
+
+      if (isPdfLink(href)) {
+        if (!results.find(r => r.url === full)) {
+          const filename = decodeURIComponent(full.split('/').pop().split('?')[0]) || 'archivo.pdf';
+          const year = extractYear(full);
+          const origen = new URL(url).pathname;
+          results.push({ año: year, carpeta: origen, nombre: filename, url: full, origen });
+          setProgress(Math.min(95, 10 + results.length * 0.8), 'Mode: web — searching for PDFs...', results.length);
+          log(`[web] PDF found: ${filename}`, 'ok');
+        }
+      } else if (!visited.has(full) && !queue.includes(full)) {
+        // solo seguir links HTML, no assets
+        const ext = full.split('?')[0].split('.').pop().toLowerCase();
+        const skip = ['jpg','jpeg','png','gif','svg','webp','css','js','ico','xml','zip','rar','mp4','mp3'];
+        if (!skip.includes(ext)) queue.push(full);
+      }
+    });
+  }
+
+  if (visited.size >= MAX_PAGES) log(`Limit of ${MAX_PAGES} pages reached.`, 'info');
+}
+
+async function startScan() {
+  const baseUrl = document.getElementById('baseUrl').value.trim();
+  if (!baseUrl) { alert('Please enter the base URL of the directory.'); return; }
+
+  allResults = [];
+  useProxy = true;
+  document.getElementById('terminal').innerHTML = '';
+  document.getElementById('terminal').classList.remove('visible');
+  document.getElementById('resultsCard').classList.remove('visible');
+  document.getElementById('progressWrap').classList.remove('visible');
+  document.getElementById('filterYear').innerHTML = '<option value="">All Years</option>';
+
+  const btn = document.getElementById('btnScan');
+  btn.disabled = true;
+  btn.textContent = 'Scanning...';
+
+  log(`Starting scan: ${baseUrl}`, 'info');
+  setProgress(5, 'Connecting...', 0);
+
+  try {
+    // Auto-detect mode
+    const firstPage = await fetchPage(baseUrl);
+    if (!firstPage) throw new Error('The URL could not be accessed.');
+
+    const visited = new Set();
+    if (isApacheIndex(firstPage)) {
+      log('Mode detected: Apache/Nginx directory', 'info');
+      await scanDirectory(baseUrl.endsWith('/') ? baseUrl : baseUrl + '/', baseUrl, 0, allResults, visited);
+    } else {
+      log('Mode detected: website — starting crawler', 'info');
+      await crawlWebsite(baseUrl, allResults, visited);
+    }
+
+    setProgress(100, 'Complete', allResults.length);
+    log(`Scan complete. ${allResults.length} PDF(s) found.`, 'ok');
+    showResults(allResults);
+  } catch(e) {
+    log(`Unexpected Error: ${e.message}`, 'err');
+  }
+
+  btn.disabled = false;
+  btn.textContent = 'Scan';
+}
+
+function showResults(data) {
+  if (!data.length) { log('No PDFs found.', 'err'); return; }
+
+  const folders = new Set(data.map(r => r.carpeta)).size;
+  const years = new Set(data.map(r => r.año).filter(Boolean));
+  document.getElementById('statTotal').textContent = data.length;
+  document.getElementById('statFolders').textContent = folders;
+  document.getElementById('statYears').textContent = years.size;
+
+  const sel = document.getElementById('filterYear');
+  [...years].sort().reverse().forEach(y => {
+    const opt = document.createElement('option');
+    opt.value = y; opt.textContent = y;
+    sel.appendChild(opt);
+  });
+
+  renderPreview(data);
+  document.getElementById('resultsCard').classList.add('visible');
+  setTimeout(() => document.getElementById('resultsCard').scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
+}
+
+function renderPreview(data) {
+  const PREVIEW = 8;
+  const tbody = document.getElementById('previewBody');
+  tbody.innerHTML = '';
+  data.slice(0, PREVIEW).forEach(row => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${row.año || '—'}</td>
+      <td title="${row.carpeta}">${row.carpeta}</td>
+      <td title="${row.nombre}">${row.nombre}</td>
+      <td class="td-url" title="${row.url}">${row.url}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  const more = document.getElementById('moreRows');
+  if (data.length > PREVIEW) {
+    more.style.display = 'block';
+    more.textContent = `+ ${data.length - PREVIEW} fila${data.length - PREVIEW !== 1 ? 's' : ''} más en el Excel`;
+  } else {
+    more.style.display = 'none';
+  }
+}
+
+document.getElementById('filterYear').addEventListener('change', function() {
+  const filtered = this.value ? allResults.filter(r => r.año === this.value) : allResults;
+  document.getElementById('statTotal').textContent = filtered.length;
+  renderPreview(filtered);
+});
+
+function getFilteredData() {
+  const year = document.getElementById('filterYear').value;
+  return year ? allResults.filter(r => r.año === year) : allResults;
+}
+
+function downloadExcel() {
+  const data = getFilteredData();
+  if (!data.length) return;
+
+  const wsData = [
+    ['Year', 'Folder', 'File Name', 'Download URL'],
+    ...data.map(r => [r.año, r.carpeta, r.nombre, r.url])
+  ];
+
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet(wsData);
+  ws['!cols'] = [{ wch: 8 }, { wch: 30 }, { wch: 45 }, { wch: 70 }];
+  XLSX.utils.book_append_sheet(wb, ws, 'PDFs');
+
+  const name = (document.getElementById('fileName').value.trim() || 'pdf_list') + '.xlsx';
+  XLSX.writeFile(wb, name);
+  log(`Excel generated: ${name} (${data.length} rows)`, 'ok');
+}
+
+function resetApp() {
+  allResults = [];
+  document.getElementById('baseUrl').value = '';
+  document.getElementById('terminal').innerHTML = '';
+  document.getElementById('terminal').classList.remove('visible');
+  document.getElementById('resultsCard').classList.remove('visible');
+  document.getElementById('progressWrap').classList.remove('visible');
+  document.getElementById('filterYear').innerHTML = '<option value="">All years</option>';
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+</script>
+</body>
+</html>
