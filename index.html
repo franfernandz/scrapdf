@@ -311,11 +311,12 @@
     .btn-secondary {
       background: transparent;
       border: 1px solid var(--accent);
-      color: var(--accent);
+      color: var(--accent-dim);
     }
 
     .btn-secondary:hover {
       background: rgba(200, 240, 96, 0.07);
+      color: var(--text);
     }
 
     /* Progress */
@@ -330,8 +331,8 @@
 
     .progress-label {
       font-family: var(--mono);
-      font-size: 11px;
-      color: var(--text-dim);
+      font-size: 14px;
+      color: var(--accent-dim);
       margin-bottom: 8px;
       display: flex;
       justify-content: space-between;
@@ -355,12 +356,12 @@
 
     /* Terminal */
     .terminal {
-      background: #080808;
+      background: var(--bg);
       border: 1px solid var(--border);
       border-radius: 4px;
       padding: 16px 18px;
       font-family: var(--mono);
-      font-size: 11px;
+      font-size: 14px;
       line-height: 1.8;
       max-height: 200px;
       overflow-y: auto;
@@ -480,9 +481,9 @@
     th {
       background: #111;
       font-family: var(--mono);
-      font-size: 10px;
+      font-size: 14px;
       letter-spacing: 0.1em;
-      color: var(--accent-dim);
+      color: var(--text);
       text-transform: uppercase;
       padding: 10px 12px;
       text-align: left;
@@ -493,7 +494,7 @@
     td {
       padding: 9px 12px;
       border-bottom: 1px solid var(--border);
-      color: var(--text);
+      color: var(--accent-dim);
       font-family: var(--mono);
       max-width: 220px;
       overflow: hidden;
